@@ -1,5 +1,4 @@
-
-name: Android CI (Debian container with expect)
+name: Android CI (Debian container, Android 16)
 
 on:
   push:
@@ -31,7 +30,6 @@ jobs:
           echo "ANDROID_HOME=$HOME/android" >> $GITHUB_ENV
           echo "PATH=$PATH:$HOME/android/cmdline-tools/latest/bin:$HOME/android/platform-tools" >> $GITHUB_ENV
 
-      # ✅ 用 expect 自动接受所有许可证
       - name: Accept Android SDK licenses
         run: |
           expect -c '
@@ -43,18 +41,19 @@ jobs:
             }
           '
 
-      - name: Install Android SDK components
+      - name: Install Android SDK components (Android 16)
         run: |
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.4"
+          sdkmanager --update
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;latest"
 
-      - name: Generate keystore
+      - name: Generate temporary keystore
         run: |
           keytool -genkey -v -keystore keystore.jks \
             -alias release -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=CI Builder, OU=Dev, O=Company, L=City, ST=State, C=XX"
 
-      - name: Grant permission for gradlew
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build Release APK
@@ -65,10 +64,8 @@ jobs:
           KEY_ALIAS: release
           KEY_PASSWORD: android
 
-      - name: Upload APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
-
-#fuck you too
