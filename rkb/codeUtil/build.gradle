@@ -4,18 +4,17 @@ plugins {
 
 android {
     compileSdk rootProject.ext.compileSdk
-    buildToolsVersion rootProject.ext.buildTools
     namespace rootProject.ext.packageName+".codeUtil"
-    
+
     defaultConfig {
         minSdkVersion rootProject.ext.minSdk
         targetSdkVersion rootProject.ext.targetSdk
     }
-    
+
     compileOptions {
-		sourceCompatibility JavaVersion.VERSION_17
-		targetCompatibility JavaVersion.VERSION_17
-	}
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
 }
 
 dependencies {
