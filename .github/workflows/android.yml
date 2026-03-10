@@ -1,0 +1,53 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. 设置 JDK 17（匹配项目需求）
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 2. 生成临时 keystore（未加密，仅用于本次构建）
+      - name: Generate temporary keystore
+        run: |
+          keytool -genkey -v -keystore keystore.jks \
+            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=CI Builder, OU=Dev, O=Company, L=City, ST=State, C=XX"
+        # 这里使用固定的弱密码 android，仅用于 CI 构建，无需担心泄露
+
+      # 3. 授权 gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. 构建 release 包（自动使用刚刚生成的 keystore）
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+        env:
+          # 如果 build.gradle 配置了从环境变量读取签名信息，可以传进去
+          # 但更简单的是直接在 gradle.properties 里指定签名文件（见下文）
+          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
+          KEYSTORE_PASSWORD: android
+          KEY_ALIAS: release
+          KEY_PASSWORD: android
+
+      # 5. 上传签名后的 APK
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
