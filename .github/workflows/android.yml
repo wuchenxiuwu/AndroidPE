@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 设置 JDK 17（匹配项目需求）
+      # 1. 设置 JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -21,31 +21,36 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 2. 生成临时 keystore（未加密，仅用于本次构建）
+      # 2. 生成临时 keystore
       - name: Generate temporary keystore
         run: |
           keytool -genkey -v -keystore keystore.jks \
             -alias release -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=CI Builder, OU=Dev, O=Company, L=City, ST=State, C=XX"
-        # 这里使用固定的弱密码 android，仅用于 CI 构建，无需担心泄露
 
       # 3. 授权 gradlew
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. 构建 release 包（自动使用刚刚生成的 keystore）
+      # 4. 安装缺失的 Android SDK 组件（新增）
+      - name: Install Android SDK Build-Tools
+        run: |
+          # 接受所有许可证（避免交互）
+          yes | sdkmanager --licenses
+          # 安装 build-tools 34.0.4 和对应的 platform
+          sdkmanager "build-tools;34.0.4" "platforms;android-34"
+
+      # 5. 构建 release 包
       - name: Build Release APK
         run: ./gradlew assembleRelease
         env:
-          # 如果 build.gradle 配置了从环境变量读取签名信息，可以传进去
-          # 但更简单的是直接在 gradle.properties 里指定签名文件（见下文）
           KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
           KEYSTORE_PASSWORD: android
           KEY_ALIAS: release
           KEY_PASSWORD: android
 
-      # 5. 上传签名后的 APK
+      # 6. 上传签名后的 APK
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
