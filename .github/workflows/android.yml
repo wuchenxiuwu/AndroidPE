@@ -13,7 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 设置 JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -21,7 +20,10 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 2. 生成临时 keystore
+      # 新增：配置 Android SDK 环境（确保 sdkmanager 可用）
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Generate temporary keystore
         run: |
           keytool -genkey -v -keystore keystore.jks \
@@ -29,19 +31,15 @@ jobs:
             -storepass android -keypass android \
             -dname "CN=CI Builder, OU=Dev, O=Company, L=City, ST=State, C=XX"
 
-      # 3. 授权 gradlew
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. 安装缺失的 Android SDK 组件（新增）
       - name: Install Android SDK Build-Tools
         run: |
-          # 接受所有许可证（避免交互）
-          yes | sdkmanager --licenses
-          # 安装 build-tools 34.0.4 和对应的 platform
+          # 接受许可证（忽略管道错误）
+          yes | sdkmanager --licenses || true
           sdkmanager "build-tools;34.0.4" "platforms;android-34"
 
-      # 5. 构建 release 包
       - name: Build Release APK
         run: ./gradlew assembleRelease
         env:
@@ -50,7 +48,6 @@ jobs:
           KEY_ALIAS: release
           KEY_PASSWORD: android
 
-      # 6. 上传签名后的 APK
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
