@@ -1,4 +1,4 @@
-name: Android CI
+name: Android CI (Debian container)
 
 on:
   push:
@@ -9,47 +9,67 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim   # 轻量 Debian 12
+      options: --user root          # 以 root 运行，方便装软件
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
+      # 1. 安装基础工具和 JDK 17
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y wget unzip git openjdk-17-jdk-headless
+          java -version
 
-      # 新增：配置 Android SDK 环境（确保 sdkmanager 可用）
+      # 2. 下载并安装 Android SDK command-line tools
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          mkdir -p $HOME/android/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-12266719_latest.zip
+          unzip -q commandlinetools-linux-*.zip -d $HOME/android/cmdline-tools
+          # 移动目录结构（因为解压后是 cmdline-tools 文件夹，需要将其内容移到最新版本目录下）
+          mv $HOME/android/cmdline-tools/cmdline-tools $HOME/android/cmdline-tools/latest
+          export PATH=$PATH:$HOME/android/cmdline-tools/latest/bin
+          # 保存环境变量供后续步骤使用
+          echo "ANDROID_HOME=$HOME/android" >> $GITHUB_ENV
+          echo "PATH=$PATH:$HOME/android/cmdline-tools/latest/bin:$HOME/android/platform-tools" >> $GITHUB_ENV
 
-      - name: Generate temporary keystore
+      # 3. 接受许可证并安装 Build-Tools 34.0.4 和 Android 34 平台
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.4"
+
+      # 4. 生成临时 keystore
+      - name: Generate keystore
         run: |
           keytool -genkey -v -keystore keystore.jks \
             -alias release -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=CI Builder, OU=Dev, O=Company, L=City, ST=State, C=XX"
 
-      - name: Grant execute permission for gradlew
+      # 5. 授权 gradlew
+      - name: Grant permission for gradlew
         run: chmod +x gradlew
 
-      - name: Install Android SDK Build-Tools
-        run: |
-          # 接受许可证（忽略管道错误）
-          yes | sdkmanager --licenses || true
-          sdkmanager "build-tools;34.0.4" "platforms;android-34"
-
-      - name: Build Release APK
+      # 6. 构建 Release APK
+      - name: Build with Gradle
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
           KEYSTORE_PASSWORD: android
           KEY_ALIAS: release
           KEY_PASSWORD: android
+        # 容器内工作目录自动映射到 github.workspace
 
-      - name: Upload Release APK
+      # 7. 上传 APK（容器内的文件直接在宿主机可见）
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
+
+
+#fuck you too
