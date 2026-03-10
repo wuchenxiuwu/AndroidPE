@@ -1,4 +1,4 @@
-name: Android CI (Debian container, Android 16)
+name: Android CI (Debian container, Android 16, let Gradle handle build-tools)
 
 on:
   push:
@@ -41,10 +41,10 @@ jobs:
             }
           '
 
-      - name: Install Android SDK components (Android 16)
+      - name: Install Android SDK components (minimal)
         run: |
           sdkmanager --update
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;latest"
+          sdkmanager "platform-tools" "platforms;android-36"
 
       - name: Generate temporary keystore
         run: |
